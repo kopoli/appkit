@@ -9,8 +9,8 @@ type Options interface {
 	IsSet(key string) bool
 }
 
-// New returns a new Options structure
-func New() Options {
+// NewOptions returns a new Options structure
+func NewOptions() Options {
 	return &optionMap{
 		values: make(map[string]string),
 	}
