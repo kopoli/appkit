@@ -9,6 +9,9 @@ import (
 
 func licenseFormat(pkg, name, text string, format string, a ...interface{}) string {
 	s := format
+	pkg = strings.ReplaceAll(pkg, "%", "%%")
+	name = strings.ReplaceAll(name, "%", "%%")
+	text = strings.ReplaceAll(text, "%", "%%")
 	s = strings.ReplaceAll(s, "%Lp", pkg)
 	s = strings.ReplaceAll(s, "%Ln", name)
 	s = strings.ReplaceAll(s, "%Lt", text)
