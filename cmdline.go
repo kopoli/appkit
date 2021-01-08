@@ -18,6 +18,7 @@ type Command struct {
 	subCommands []*Command
 }
 
+// HasFlags returns true if a flag.FlagSet has any flags.
 func HasFlags(fs *flag.FlagSet) bool {
 	ret := false
 	fs.VisitAll(func(f *flag.Flag) {
@@ -26,18 +27,59 @@ func HasFlags(fs *flag.FlagSet) bool {
 	return ret
 }
 
+// SplitCommand splits a command string to a command and its synonyms. See
+// NewCommand for more information.
 func SplitCommand(cmdstr string) []string {
 	return strings.Fields(cmdstr)
 }
 
+// SplitArguments splits the arguments from the option "cmdline-args". See
+// Parse for details.
 func SplitArguments(argstr string) []string {
 	return strings.Split(argstr, "\000")
 }
 
+// JoinArguments is the counter operation for SplitArguments. See that for
+// more details.
 func JoinArguments(args []string) string {
 	return strings.Join(args, "\000")
 }
 
+// NewCommand creates a recursive command line argument with flags.
+//
+// Parent of the top-level command should be nil. The cmd string can contain
+// multiple space-separated commands that are regarded as synonyms of the
+// command. The help string is displayed if help option is given.
+//
+// Example:
+//
+//   opts := appkit.NewOptions()
+//   base := appkit.NewCommand(nil, "", "")
+//   optVersion := base.Flags.Bool("version", false, "Display version")
+//   add := appkit.NewCommand(base, "add a", "Adding stuff")
+//   _ = appkit.NewCommand(add, "package p", "Add package")
+//   _ = appkit.NewCommand(add, "dependency d", "Add dependency")
+//   del := appkit.NewCommand(base, "delete del d", "Deleting stuff")
+//   _ = appkit.NewCommand(del, "package p", "Delete package")
+//   _ = appkit.NewCommand(del, "dependency d", "Delete dependency")
+//   optRecurse := del.Flags.Bool("recurse", false, "Delete recursively")
+//
+//   err = base.Parse(os.Args[1:], opts)
+//   if err == flag.ErrHelp {
+//      os.Exit(0)
+//   }
+//
+//   if *optVersion {
+//   fmt.Println(appkit.VersionString(opts))
+//      os.Exit(0)
+//   }
+//   cmd := opts.Get("cmdline-command", "")
+//   switch cmd {
+//   case "add package":
+//   ...
+//   case "delete package":
+//   ...
+//   }
 func NewCommand(parent *Command, cmd string, help string) *Command {
 	cmds := []string{""}
 	if len(cmd) > 0 {
@@ -74,6 +116,19 @@ func NewCommand(parent *Command, cmd string, help string) *Command {
 	return ret
 }
 
+
+// Parse the command line arguments according to the recursive command
+// structure.
+//
+// The actual command will be set to the option "cmdline-command" inside the
+// opts structure. Additional positional arguments after the command are in
+// the "cmdline-args" option.
+//
+// Recursive commands in "cmdline-command" are space separated. If there are
+// multiple synonyms defined for a command, the first one is listed.
+//
+// The positional arguments in "cmdline-args" are NUL separated inside the
+// string. They can be split to an array using SplitArguments.
 func (c *Command) Parse(args []string, opts Options) error {
 	var err error
 	if c.Flags != nil {
@@ -112,6 +167,8 @@ func (c *Command) Parse(args []string, opts Options) error {
 	return nil
 }
 
+// CommandList prints out a recursive tree of sub-commands to the given
+// io.Writer.
 func (c *Command) CommandList(out io.Writer) {
 	wr := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 	var printall func(pfx string, c *Command)
