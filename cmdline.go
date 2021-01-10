@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"strings"
 	"text/tabwriter"
@@ -50,6 +51,9 @@ func JoinArguments(args []string) string {
 // Parent of the top-level command should be nil. The cmd string can contain
 // multiple space-separated commands that are regarded as synonyms of the
 // command. The help string is displayed if help option is given.
+//
+// If parent == nil, then the Usage function prints out all sub-commands with
+// helps. This can be overridden by re-defining the Flags.Usage function.
 //
 // Example:
 //
@@ -102,8 +106,15 @@ func NewCommand(parent *Command, cmd string, help string) *Command {
 
 	flags.Usage = func() {
 		out := flags.Output()
-		fmt.Fprintf(out, "Command: %s\n\n%s\n",
-			strings.Join(ret.Cmd, ", "), ret.Help)
+		if parent == nil {
+			fmt.Fprintf(out,
+				"%s: %s\n\nCommands:\n",
+				os.Args[0], ret.Help)
+			ret.CommandList(out)
+		} else {
+			fmt.Fprintf(out, "Command: %s\n\n%s\n",
+				strings.Join(ret.Cmd, ", "), ret.Help)
+		}
 		if HasFlags(flags) {
 			fmt.Fprintf(out, "\nOptions:\n")
 			flags.PrintDefaults()
@@ -115,7 +126,6 @@ func NewCommand(parent *Command, cmd string, help string) *Command {
 	}
 	return ret
 }
-
 
 // Parse the command line arguments according to the recursive command
 // structure.
