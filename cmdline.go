@@ -13,10 +13,18 @@ import (
 var cmdParseRegex = regexp.MustCompile(`[A-Za-z0-9][-A-Za-z0-9]*`)
 
 type Command struct {
-	Cmd         []string
-	Help        string
+	Cmd []string
+
+	// Help that describes command
+	Help string
+	// The sub-command portion of the Usage line in the help
+	SubCommandHelp string
+	// The argument portion of the Usage line in the help
+	ArgumentHelp string
+
 	Flags       *flag.FlagSet
 	subCommands []*Command
+	parent      *Command
 }
 
 // HasFlags returns true if a flag.FlagSet has any flags.
@@ -99,21 +107,50 @@ func NewCommand(parent *Command, cmd string, help string) *Command {
 	flags := flag.NewFlagSet(cmds[0], flag.ContinueOnError)
 
 	ret := &Command{
-		Cmd:   cmds,
-		Help:  help,
-		Flags: flags,
+		Cmd:            cmds,
+		Help:           help,
+		SubCommandHelp: "",
+		// By default, the arguments for a command are accumulated
+		ArgumentHelp: "[ARG ...]",
+		Flags:        flags,
+		parent:       parent,
 	}
 
 	flags.Usage = func() {
 		out := flags.Output()
-		if parent == nil {
-			fmt.Fprintf(out,
-				"%s: %s\n\nCommands:\n",
-				os.Args[0], ret.Help)
-			ret.CommandList(out)
+		optstring := " [OPTIONS]"
+		if !HasFlags(flags) {
+			// The -h and -help come from the flag-package.
+			optstring = " [-h|-help]"
+		}
+
+		cmdstring := ret.SubCommandHelp
+		if ret.HasSubcommands() {
+			// Add sub-command help if it has NOT been overridden
+			if cmdstring == "" {
+				cmdstring = "[COMMAND]"
+			}
+			cmdstring = " " + cmdstring
+		}
+
+		if ret.IsTopLevel() {
+			fmt.Fprintf(out, "Usage: %s%s%s %s\n\n%s\n", os.Args[0],
+				optstring, cmdstring, ret.ArgumentHelp,
+				ret.Help)
+			if ret.HasSubcommands() {
+				fmt.Fprintf(out, "\nCommands:\n")
+				ret.CommandList(out)
+			}
 		} else {
-			fmt.Fprintf(out, "Command: %s\n\n%s\n",
-				strings.Join(ret.Cmd, ", "), ret.Help)
+			fmt.Fprintf(out, "Usage: %s %s%s%s %s\n\n%s\n",
+				os.Args[0], ret.FullCommandName(),
+				optstring, cmdstring, ret.ArgumentHelp,
+				ret.Help)
+
+			if ret.HasSubcommands() {
+				fmt.Fprintf(out, "\nSub-commands:\n")
+				ret.CommandList(out)
+			}
 		}
 		if HasFlags(flags) {
 			fmt.Fprintf(out, "\nOptions:\n")
@@ -121,7 +158,7 @@ func NewCommand(parent *Command, cmd string, help string) *Command {
 		}
 	}
 
-	if parent != nil {
+	if !ret.IsTopLevel() {
 		parent.subCommands = append(parent.subCommands, ret)
 	}
 	return ret
@@ -193,4 +230,26 @@ func (c *Command) CommandList(out io.Writer) {
 
 	printall("", c)
 	wr.Flush()
+}
+
+// HasSubcommands returns true if a command has any sub-commands defined.
+func (c *Command) HasSubcommands() bool {
+	return c.subCommands != nil && len(c.subCommands) > 0
+}
+
+// IsTopLevel returns true if the command has no parents
+func (c *Command) IsTopLevel() bool {
+	return c.parent == nil
+}
+
+// FullCommandName returns the full (sub-)command as a string
+func (c *Command) FullCommandName() string {
+	var buildCommandPath func(c *Command) string
+	buildCommandPath = func(c *Command) string {
+		if c == nil {
+			return ""
+		}
+		return buildCommandPath(c.parent) + " " + c.Cmd[0]
+	}
+	return strings.TrimLeft(buildCommandPath(c), " ")
 }
