@@ -45,13 +45,19 @@ func SplitCommand(cmdstr string) []string {
 // SplitArguments splits the arguments from the option "cmdline-args". See
 // Parse for details.
 func SplitArguments(argstr string) []string {
-	return strings.Split(argstr, "\000")
+	if argstr == "" {
+		return []string{}
+	}
+	return strings.Split(argstr[0:len(argstr)-1], "\000")
 }
 
 // JoinArguments is the counter operation for SplitArguments. See that for
 // more details.
 func JoinArguments(args []string) string {
-	return strings.Join(args, "\000")
+	if len(args) == 0 {
+		return ""
+	}
+	return strings.Join(args, "\000") + "\000"
 }
 
 // NewCommand creates a recursive command line argument with flags.
