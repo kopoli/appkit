@@ -220,15 +220,15 @@ func (c *Command) CommandList(out io.Writer) {
 	wr := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
 	var printall func(pfx string, c *Command)
 	printall = func(pfx string, c *Command) {
-		if c.Cmd[0] != "" {
-			fmt.Fprintf(wr, "%s%s\t-\t%s\n", pfx, strings.Join(c.Cmd, ", "), c.Help)
-		}
+		fmt.Fprintf(wr, "%s%s\t-\t%s\n", pfx, strings.Join(c.Cmd, ", "), c.Help)
 		for _, sc := range c.subCommands {
 			printall(pfx+"  ", sc)
 		}
 	}
 
-	printall("", c)
+	for _, sc := range c.subCommands {
+		printall("  ", sc)
+	}
 	wr.Flush()
 }
 
