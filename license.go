@@ -43,7 +43,7 @@ func licenseFormat(pkg, name, text string, format string, a ...interface{}) stri
 // As an implementation detail, https://github.com/kopoli/licrep generates a
 // compatible map.
 func LicenseFormatString(licenses interface{}, format string, a ...interface{}) (string, error) {
-	invalidTypeErr := fmt.Errorf("Invalid license map argument")
+	invalidTypeErr := fmt.Errorf("invalid license map argument")
 
 	licmap := reflect.ValueOf(licenses)
 	if licmap.Kind() != reflect.Map {
