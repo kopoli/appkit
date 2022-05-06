@@ -159,8 +159,7 @@ func NewCommand(parent *Command, cmd string, help string) *Command {
 			}
 		}
 		if HasFlags(flags) {
-			fmt.Fprintf(out, "\nOptions:\n")
-			flags.PrintDefaults()
+			fmt.Fprintf(out, "\nOptions:\n%s", OptionsHelp(flags))
 		}
 	}
 
@@ -258,4 +257,67 @@ func (c *Command) FullCommandName() string {
 		return buildCommandPath(c.parent) + " " + c.Cmd[0]
 	}
 	return strings.TrimLeft(buildCommandPath(c), " ")
+}
+
+// OptionsHelp is similar to flag.PrintDefaults, with the following
+// differences:
+// - Returns a string instead of printing to flagset.Output()
+// - If one character flag has the same Usage as a longer one, combine them.
+// - Use tabwriter
+func OptionsHelp(fs *flag.FlagSet) string {
+	// Collect all flags per usage
+	usages := map[string][]string{}
+	fs.VisitAll(func(f *flag.Flag) {
+		usages[f.Usage] = append(usages[f.Usage], f.Name)
+	})
+
+	sb := &strings.Builder{}
+	tw := tabwriter.NewWriter(sb, 0, 8, 2, ' ', tabwriter.TabIndent)
+
+	fs.VisitAll(func(f *flag.Flag) {
+		// Don't print a flag again
+		if len(usages[f.Usage]) == 0 {
+			return
+		}
+
+		options := usages[f.Usage]
+		usages[f.Usage] = []string{}
+
+		// Get a list of the options so the short option is first.
+		var shortOpt string
+		var allOpts []string
+		for i := range options {
+			if shortOpt == "" && len(options[i]) == 1 {
+				shortOpt = options[i]
+			} else {
+				allOpts = append(allOpts, options[i])
+			}
+		}
+		if shortOpt != "" {
+			allOpts = append([]string{shortOpt}, allOpts...)
+		}
+
+		// Get the usage and the type of the argument.
+		name, usage := flag.UnquoteUsage(f)
+		if name != "" {
+			name = " " + name
+		}
+
+		// Get the default value. This is a poor man's
+		// flag.isZeroValue.
+		defVal := ""
+		if !(f.DefValue == "" || f.DefValue == "0" || f.DefValue == "false") {
+			defVal = fmt.Sprintf(" (default %q)", f.DefValue)
+		}
+
+		// Print out the whole thing for the tabwriter.
+		fmt.Fprintf(tw, "  -%s%s\t%s%s\n",
+			strings.Join(allOpts, ", -"),
+			name,
+			strings.ReplaceAll(usage, "\n", "\n \t"),
+			defVal)
+	})
+
+	tw.Flush()
+	return sb.String()
 }
